@@ -95,7 +95,7 @@ RC Column::append(char *data, int count)
     return RC::INTERNAL;
   }
   if (count_ + count > capacity_) {
-    LOG_WARN("append data to full column");
+    // LOG_WARN("append data to full column");
     return RC::INTERNAL;
   }
 

@@ -486,56 +486,53 @@ RC PaxRecordPageHandler::delete_record(const RID *rid)
   }
 }
 
-RC PaxRecordPageHandler::get_record(const RID &rid, Record &record) {
-  // Check if the slot number is valid
+RC PaxRecordPageHandler::get_record(const RID &rid, Record &record)
+{
   if (rid.slot_num >= page_header_->record_capacity) {
-    LOG_ERROR("Invalid slot_num %d, exceeds page's record capacity, frame=%s, page_header=%s",
+    LOG_ERROR("Invalid slot_num %d, exceed page's record capacity, frame=%s, page_header=%s",
               rid.slot_num, frame_->to_string().c_str(), page_header_->to_string().c_str());
     return RC::RECORD_INVALID_RID;
   }
 
-  // Check if the slot is occupied
   Bitmap bitmap(bitmap_, page_header_->record_capacity);
   if (!bitmap.get_bit(rid.slot_num)) {
     LOG_ERROR("Invalid slot_num:%d, slot is empty, page_num %d.", rid.slot_num, frame_->page_num());
     return RC::RECORD_NOT_EXIST;
   }
 
-  // Retrieve record data
-  int column_count = page_header_->column_num;
   record.set_rid(rid);
-  int record_real_size = page_header_->record_real_size;
-  char* data = static_cast<char*>(malloc(record_real_size));
-
-  if (data == nullptr) {
-    LOG_ERROR("Memory allocation failed for record data.");
-    return RC::NOMEM;
+  // 初始化一个缓冲区来存储组合后的记录数据
+  char *record_data = static_cast<char*>(malloc(page_header_->record_real_size));
+  // 下一个列的存储起始位置
+  char *offset = record_data;
+  for (int i = 0 ; i < page_header_->column_num ; i++ ) {
+    int field_len = get_field_len(i);
+    char *field_data = get_field_data(rid.slot_num, i);
+    memcpy(offset, field_data, field_len);
+    offset += field_len;
   }
-
-  int offset = 0;
-  for (int i = 0; i < column_count; ++i) {
-    int field_length = get_field_len(i);
-    memcpy(data + offset, get_field_data(rid.slot_num, i), field_length);
-    offset += field_length;
-  }
-
-  record.set_data_owner(data, record_real_size);
+  record.set_data_owner(record_data, page_header_->record_real_size);
+  // 释放临时分配的记录数据缓冲区
   return RC::SUCCESS;
 }
 
 // TODO: specify the column_ids that chunk needed. currenly we get all columns
 RC PaxRecordPageHandler::get_chunk(Chunk &chunk)
 {
+  vector<int> pos;
+  Bitmap bitmap(bitmap_, page_header_->record_capacity);
+  int next_bit = bitmap.next_setted_bit(0);
+  while (next_bit != -1 ) {
+    pos.push_back(next_bit);
+    next_bit = bitmap.next_setted_bit(next_bit+1);
+  }
   int column_num = chunk.column_num();
   for ( int i = 0 ; i < column_num ; i++ ) {
     int col_index = chunk.column_ids(i);
-    Column *col = chunk.column_ptr(col_index);
-    Bitmap bitmap(bitmap_, page_header_->record_capacity);
-    int next_bit = bitmap.next_setted_bit(0);
-    while (next_bit != -1 ) {
-      char *field_data = get_field_data(next_bit, col_index);
+    Column *col = chunk.column_ptr(i);
+    for ( int p : pos ) {
+      char *field_data = get_field_data(p, col_index);
       col->append_one(field_data);
-      next_bit = bitmap.next_setted_bit(next_bit);
     }
   }
   return RC::SUCCESS;

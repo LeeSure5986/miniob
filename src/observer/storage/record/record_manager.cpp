@@ -529,7 +529,7 @@ RC PaxRecordPageHandler::get_chunk(Chunk &chunk)
   int column_num = chunk.column_num();
   for ( int i = 0 ; i < column_num ; i++ ) {
     int col_index = chunk.column_ids(i);
-    Column *col = chunk.column_ptr(col_index);
+    Column *col = chunk.column_ptr(i);
     for ( int p : pos ) {
       char *field_data = get_field_data(p, col_index);
       col->append_one(field_data);

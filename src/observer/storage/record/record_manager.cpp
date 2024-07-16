@@ -534,7 +534,7 @@ RC PaxRecordPageHandler::get_chunk(Chunk &chunk)
       memcpy(col_data, field_data, col_len);
       col->append_one(col_data);
       delete[] col_data;
-      int next_bit = bitmap.next_setted_bit(next_bit);
+      next_bit = bitmap.next_setted_bit(next_bit);
     }
   }
   return RC::SUCCESS;

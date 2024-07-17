@@ -51,6 +51,16 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   return expr;
 }
 
+UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
+                                           Expression *child,
+                                           const char *sql_string,
+                                           YYLTYPE *llocp)
+{
+  UnboundAggregateExpr *expr = new UnboundAggregateExpr(aggregate_name, child);
+  expr->set_name(token_name(sql_string, llocp));
+  return expr;
+}
+
 %}
 
 %define api.pure full
@@ -64,7 +74,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %parse-param { void * scanner }
 
 //标识tokens
-%token  SEMICOLON
+%token  GROUP BY
+        SUM
+        SEMICOLON
         BY
         CREATE
         DROP
@@ -530,7 +542,10 @@ expression:
     | '*' {
       $$ = new StarExpr();
     }
-    // your code here
+    // 聚合函数: SUM
+    | SUM LBRACE expression RBRACE {
+      $$ = create_aggregate_expression("SUM", $3, sql_string, &@$);
+    }
     ;
 
 rel_attr:
@@ -554,12 +569,14 @@ relation:
     }
     ;
 rel_list:
-    relation {
+    relation
+    {
       $$ = new std::vector<std::string>();
       $$->push_back($1);
       free($1);
     }
-    | relation COMMA rel_list {
+    | relation COMMA rel_list
+    {
       if ($3 != nullptr) {
         $$ = $3;
       } else {
@@ -570,7 +587,6 @@ rel_list:
       free($1);
     }
     ;
-
 where:
     /* empty */
     {
@@ -661,6 +677,10 @@ group_by:
     /* empty */
     {
       $$ = nullptr;
+    }
+    | GROUP BY rel_list
+    {
+      $$ = $2;
     }
     ;
 load_data_stmt:

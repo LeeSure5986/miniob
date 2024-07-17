@@ -120,6 +120,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   Value *                                    value;
   enum CompOp                                comp;
   RelAttrSqlNode *                           rel_attr;
+  char *                                     aggr_op;
   std::vector<AttrInfoSqlNode> *             attr_infos;
   AttrInfoSqlNode *                          attr_info;
   Expression *                               expression;
@@ -146,6 +147,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <number>              number
 %type <string>              relation
 %type <comp>                comp_op
+%type <aggr_op>             aggr_op
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
@@ -532,10 +534,15 @@ expression:
       $$ = new StarExpr();
     }
     // 聚合函数: SUM
-    | SUM LBRACE expression RBRACE {
-      $$ = create_aggregate_expression("SUM", $3, sql_string, &@$);
+    | aggr_op LBRACE expression RBRACE {
+      char *str = $1;
+      $$ = create_aggregate_expression(str, $3, sql_string, &@$);
+      free($1);
     }
     ;
+aggr_op:
+      SUM { $$ = strdup("SUM"); }
+      ;
 
 rel_attr:
     ID {
